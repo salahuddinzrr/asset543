@@ -11,6 +11,17 @@ class EmployeeProfile(models.Model):
         return f"{self.user.get_username()} ({self.phone_number})"
 
 
+class SipAccount(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sip_account")
+    sip_username = models.CharField(max_length=255, help_text="SIP username or full SIP URI user")
+    sip_domain = models.CharField(max_length=255, help_text="SIP domain, e.g. sip.yourpbx.com")
+    display_name = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self) -> str:
+        return f"{self.user.get_username()} SIP: {self.sip_username}@{self.sip_domain}"
+
+
 class Lead(models.Model):
     name = models.CharField(max_length=255)
     phone_number = models.CharField(max_length=32, help_text="E.164 format e.g. +15551234567")
@@ -39,6 +50,7 @@ class CallLog(models.Model):
     notes = models.TextField(blank=True)
     started_at = models.DateTimeField(default=timezone.now)
     ended_at = models.DateTimeField(blank=True, null=True)
+    used_sip = models.BooleanField(default=False)
 
     def __str__(self) -> str:
         return f"{self.direction} call to {self.lead} at {self.started_at:%Y-%m-%d %H:%M}"
