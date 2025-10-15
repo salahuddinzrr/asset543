@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Lead, CallLog, MessageLog, EmployeeProfile
+from .models import Lead, CallLog, MessageLog, EmployeeProfile, SipAccount
 
 
 @admin.register(Lead)
@@ -28,3 +28,10 @@ class MessageLogAdmin(admin.ModelAdmin):
 class EmployeeProfileAdmin(admin.ModelAdmin):
     list_display = ("user", "phone_number")
     search_fields = ("user__username", "phone_number")
+
+
+@admin.register(SipAccount)
+class SipAccountAdmin(admin.ModelAdmin):
+    list_display = ("user", "sip_username", "sip_domain", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("user__username", "sip_username", "sip_domain")

@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import CallLog, EmployeeProfile, Lead, MessageLog
+from .models import CallLog, EmployeeProfile, Lead, MessageLog, SipAccount
 
 
 try:
@@ -35,6 +35,32 @@ def lead_list(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+def sip_settings(request: HttpRequest) -> HttpResponse:
+    sip: Optional[SipAccount] = getattr(request.user, "sip_account", None)
+    if request.method == "POST":
+        username = request.POST.get("sip_username", "").strip()
+        domain = request.POST.get("sip_domain", "").strip()
+        display = request.POST.get("display_name", "").strip()
+        active = request.POST.get("is_active") == "on"
+        if sip is None:
+            sip = SipAccount.objects.create(
+                user=request.user,
+                sip_username=username,
+                sip_domain=domain,
+                display_name=display,
+                is_active=active,
+            )
+        else:
+            sip.sip_username = username
+            sip.sip_domain = domain
+            sip.display_name = display
+            sip.is_active = active
+            sip.save()
+        return redirect("crm:sip_settings")
+    return render(request, "crm/sip_settings.html", {"sip": sip})
+
+
+@login_required
 def lead_detail(request: HttpRequest, lead_id: int) -> HttpResponse:
     lead = get_object_or_404(Lead, id=lead_id)
     call_logs = lead.call_logs.order_by("-started_at")[:50]
@@ -51,7 +77,10 @@ def click_to_call(request: HttpRequest, lead_id: int) -> HttpResponse:
     lead = get_object_or_404(Lead, id=lead_id)
     employee_profile: Optional[EmployeeProfile] = getattr(request.user, "employee_profile", None)
     if employee_profile is None or not employee_profile.phone_number:
-        return JsonResponse({"error": "Your employee profile phone number is not configured."}, status=400)
+        # allow SIP-only users
+        sip: Optional[SipAccount] = getattr(request.user, "sip_account", None)
+        if sip is None or not sip.is_active:
+            return JsonResponse({"error": "Configure phone number or SIP account first."}, status=400)
 
     call_log = CallLog.objects.create(
         lead=lead,
@@ -67,17 +96,30 @@ def click_to_call(request: HttpRequest, lead_id: int) -> HttpResponse:
     )
     status_callback_url = request.build_absolute_uri(reverse("crm:voice_status_callback"))
 
+    # Prefer SIP if configured and active
+    sip_account: Optional[SipAccount] = getattr(request.user, "sip_account", None)
+    to_target: str
+    used_sip = False
+    if sip_account and sip_account.is_active:
+        username = sip_account.sip_username
+        domain = sip_account.sip_domain
+        to_target = f"sip:{username}@{domain}"
+        used_sip = True
+    else:
+        to_target = employee_profile.phone_number
+
     try:
         call = client.calls.create(
-            to=employee_profile.phone_number,  # Call employee first
+            to=to_target,
             from_=settings.TWILIO_FROM_NUMBER,
-            url=connect_url,  # When employee answers, Twilio fetches this TwiML which dials the lead
+            url=connect_url,
             status_callback=status_callback_url,
             status_callback_event=["initiated", "ringing", "answered", "completed"],
         )
         call_log.twilio_call_sid = call.sid
-        call_log.status = call.status or "queued"
-        call_log.save(update_fields=["twilio_call_sid", "status"])
+        call_log.status = getattr(call, "status", None) or "queued"
+        call_log.used_sip = used_sip
+        call_log.save(update_fields=["twilio_call_sid", "status", "used_sip"])
     except Exception as exc:  # pragma: no cover - depends on external service
         call_log.status = "failed"
         call_log.notes = str(exc)
