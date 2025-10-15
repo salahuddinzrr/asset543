@@ -1,0 +1,94 @@
+{% extends 'blog/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title">Lead: {{ lead.name }}</h3>
+            <div>
+              <a class="btn btn-primary" href="{% url 'crm:click_to_call' lead.id %}"><i class="fas fa-phone"></i> Call</a>
+            </div>
+          </div>
+          <div class="card-body">
+            <p><strong>Phone:</strong> {{ lead.phone_number }}</p>
+            <p><strong>Email:</strong> {{ lead.email|default:'-' }}</p>
+            <p><strong>Notes:</strong><br>{{ lead.notes|linebreaks }}</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Recent Calls</h3>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Dir</th>
+                  <th>Status</th>
+                  <th>Duration</th>
+                  <th>Recording</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in call_logs %}
+                <tr>
+                  <td>{{ log.started_at|date:'Y-m-d H:i' }}</td>
+                  <td>{{ log.direction }}</td>
+                  <td>{{ log.status }}</td>
+                  <td>{{ log.duration_seconds }}s</td>
+                  <td>
+                    {% if log.recording_url %}
+                      <a href="{{ log.recording_url }}" target="_blank">Listen</a>
+                    {% else %}-{% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center text-muted">No calls yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4" id="sms">
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Send SMS</h3></div>
+          <div class="card-body">
+            <form method="post" action="{% url 'crm:send_sms' lead.id %}">
+              {% csrf_token %}
+              <div class="form-group">
+                <textarea class="form-control" name="body" rows="3" placeholder="Type your message..."></textarea>
+              </div>
+              <button class="btn btn-secondary" type="submit"><i class="fas fa-paper-plane"></i> Send</button>
+            </form>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 class="card-title">Recent Messages</h3></div>
+          <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+              {% for msg in message_logs %}
+              <li class="list-group-item d-flex justify-content-between">
+                <div>
+                  <div class="small text-muted">{{ msg.created_at|date:'Y-m-d H:i' }} • {{ msg.direction }}</div>
+                  <div>{{ msg.body|default:'-' }}</div>
+                </div>
+                <span class="badge badge-light">{{ msg.status }}</span>
+              </li>
+              {% empty %}
+              <li class="list-group-item text-center text-muted">No messages yet.</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

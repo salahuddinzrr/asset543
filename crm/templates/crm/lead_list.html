@@ -1,0 +1,51 @@
+{% extends 'blog/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Leads</h3>
+          </div>
+          <div class="card-body table-responsive p-0">
+            <table class="table table-hover text-nowrap">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Phone</th>
+                  <th>Email</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for lead in leads %}
+                <tr>
+                  <td><a href="{% url 'crm:lead_detail' lead.id %}">{{ lead.name }}</a></td>
+                  <td>{{ lead.phone_number }}</td>
+                  <td>{{ lead.email|default:'-' }}</td>
+                  <td>
+                    <a class="btn btn-sm btn-primary" href="{% url 'crm:click_to_call' lead.id %}">
+                      <i class="fas fa-phone"></i> Call
+                    </a>
+                    <a class="btn btn-sm btn-secondary" href="{% url 'crm:lead_detail' lead.id %}#sms">
+                      <i class="fas fa-sms"></i> SMS
+                    </a>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted">No leads yet.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
